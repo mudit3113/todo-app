@@ -1,16 +1,24 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
-import { format, addDays } from "date-fns";
+import { Plus, Filter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
+import { format, addDays, parseISO, isToday, isYesterday, isTomorrow } from "date-fns";
 import { Todo, Goal } from "@/types";
 import TodoItem from "@/components/TodoItem";
-import AddTodoModal from "@/components/AddTodoModal";
+import AddTodoModal, { TodoFormData } from "@/components/AddTodoModal";
 import AITodoInput from "@/components/AITodoInput";
 import { PRIORITY_COLORS } from "@/lib/utils";
 
 const PRIORITY_ORDER: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 const UPCOMING_DAYS = 7;
+
+function dayLabel(dateStr: string) {
+  const d = parseISO(dateStr);
+  if (isToday(d)) return "Today";
+  if (isYesterday(d)) return "Yesterday";
+  if (isTomorrow(d)) return "Tomorrow";
+  return format(d, "EEEE, MMMM d");
+}
 
 export default function DashboardPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
@@ -18,18 +26,21 @@ export default function DashboardPage() {
   const [showUpcoming, setShowUpcoming] = useState(true);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
   const [filter, setFilter] = useState<"ALL" | "PERSONAL" | "PROFESSIONAL">("ALL");
   const [loading, setLoading] = useState(true);
 
   const today = new Date();
   const todayStr = format(today, "yyyy-MM-dd");
+  const [selectedDate, setSelectedDate] = useState(todayStr);
 
   const fetchTodos = useCallback(async () => {
-    const res = await fetch(`/api/todos?date=${todayStr}`);
+    setLoading(true);
+    const res = await fetch(`/api/todos?date=${selectedDate}`);
     const data = await res.json();
     setTodos(data);
     setLoading(false);
-  }, [todayStr]);
+  }, [selectedDate]);
 
   const fetchUpcoming = useCallback(async () => {
     const from = format(addDays(today, 1), "yyyy-MM-dd");
@@ -42,24 +53,43 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchTodos();
+  }, [fetchTodos]);
+
+  useEffect(() => {
     fetchUpcoming();
     fetch("/api/goals").then((r) => r.json()).then(setGoals);
-  }, [fetchTodos, fetchUpcoming]);
+  }, [fetchUpcoming]);
 
-  const handleAdd = async (data: Parameters<typeof AddTodoModal>[0]["onAdd"] extends (d: infer D) => unknown ? D : never) => {
-    const dueDate = data.dueDate || todayStr;
+  const goToDate = (dateStr: string) => setSelectedDate(dateStr);
+  const shiftDate = (deltaDays: number) => {
+    setSelectedDate(format(addDays(parseISO(selectedDate), deltaDays), "yyyy-MM-dd"));
+  };
+
+  const handleAdd = async (data: TodoFormData) => {
+    const dueDate = data.dueDate || selectedDate;
     const res = await fetch("/api/todos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ...data, dueDate }),
     });
     const newTodo = await res.json();
-    if (dueDate === todayStr) {
+    if (dueDate === selectedDate) {
       setTodos((prev) => [newTodo, ...prev]);
     } else if (dueDate > todayStr) {
       setUpcoming((prev) => [newTodo, ...prev]);
     }
     setShowModal(false);
+  };
+
+  const handleEditSubmit = async (data: TodoFormData) => {
+    if (!editingTodo) return;
+    await fetch(`/api/todos/${editingTodo.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    setEditingTodo(null);
+    await Promise.all([fetchTodos(), fetchUpcoming()]);
   };
 
   const handleToggle = async (id: string, status: string) => {
@@ -101,23 +131,67 @@ export default function DashboardPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
+      <div className="flex items-start justify-between mb-3 gap-3">
+        <div className="min-w-0">
           <h1 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
-            {format(today, "EEEE, MMMM d")}
+            {dayLabel(selectedDate)}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: "var(--muted)" }}>
-            {total === 0 ? "No tasks today" : `${completed} of ${total} done`}
+            {total === 0 ? "No tasks" : `${completed} of ${total} done`}
           </p>
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white shrink-0"
           style={{ background: "var(--accent)" }}
         >
           <Plus size={16} /> Add Todo
         </button>
+      </div>
+
+      {/* Date navigation */}
+      <div className="flex items-center gap-2 mb-6">
+        <button
+          onClick={() => shiftDate(-1)}
+          className="p-1.5 rounded-md"
+          style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+          title="Previous day"
+        >
+          <ChevronLeft size={15} />
+        </button>
+        <button
+          onClick={() => shiftDate(1)}
+          className="p-1.5 rounded-md"
+          style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+          title="Next day"
+        >
+          <ChevronRight size={15} />
+        </button>
+
+        <label
+          className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md cursor-pointer relative"
+          style={{ background: "var(--surface-2)", color: "var(--muted)" }}
+        >
+          <CalendarDays size={13} />
+          {selectedDate}
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => goToDate(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+        </label>
+
+        {selectedDate !== todayStr && (
+          <button
+            onClick={() => goToDate(todayStr)}
+            className="text-xs px-3 py-1.5 rounded-md"
+            style={{ background: "var(--accent)" + "22", color: "var(--accent)" }}
+          >
+            Today
+          </button>
+        )}
       </div>
 
       {/* Progress bar */}
@@ -168,13 +242,13 @@ export default function DashboardPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <p className="text-sm" style={{ color: "var(--muted)" }}>
-            {todos.length === 0 ? "Add your first task for today" : "No tasks match this filter"}
+            {todos.length === 0 ? `No tasks for ${dayLabel(selectedDate).toLowerCase()}` : "No tasks match this filter"}
           </p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {filtered.map((todo) => (
-            <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} />
+            <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} onEdit={setEditingTodo} />
           ))}
         </div>
       )}
@@ -200,7 +274,7 @@ export default function DashboardPage() {
                   </p>
                   <div className="flex flex-col gap-2">
                     {upcomingByDate[dateKey].map((todo) => (
-                      <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} />
+                      <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} onEdit={setEditingTodo} />
                     ))}
                   </div>
                 </div>
@@ -225,7 +299,16 @@ export default function DashboardPage() {
       )}
 
       {showModal && (
-        <AddTodoModal goals={goals} onAdd={handleAdd} onClose={() => setShowModal(false)} />
+        <AddTodoModal goals={goals} onSubmit={handleAdd} onClose={() => setShowModal(false)} />
+      )}
+
+      {editingTodo && (
+        <AddTodoModal
+          goals={goals}
+          todo={editingTodo}
+          onSubmit={handleEditSubmit}
+          onClose={() => setEditingTodo(null)}
+        />
       )}
     </div>
   );

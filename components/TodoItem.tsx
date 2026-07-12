@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Trash2, ChevronDown, ChevronUp, Calendar, Briefcase } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, Calendar, Briefcase, Pencil } from "lucide-react";
 import { Todo } from "@/types";
 import { PRIORITY_COLORS, PRIORITY_LABELS, cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -11,9 +11,10 @@ interface Props {
   todo: Todo;
   onToggle: (id: string, status: string) => void;
   onDelete: (id: string) => void;
+  onEdit?: (todo: Todo) => void;
 }
 
-export default function TodoItem({ todo, onToggle, onDelete }: Props) {
+export default function TodoItem({ todo, onToggle, onDelete, onEdit }: Props) {
   const [expanded, setExpanded] = useState(false);
   const isDone = todo.status === "COMPLETED";
 
@@ -65,6 +66,16 @@ export default function TodoItem({ todo, onToggle, onDelete }: Props) {
               className="hover:text-white transition-colors"
             >
               {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          )}
+
+          {onEdit && (
+            <button
+              onClick={() => onEdit(todo)}
+              style={{ color: "var(--muted)" }}
+              className="hover:text-white transition-colors"
+            >
+              <Pencil size={13} />
             </button>
           )}
 

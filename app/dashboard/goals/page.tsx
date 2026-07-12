@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Plus, Target } from "lucide-react";
 import { Goal } from "@/types";
 
@@ -140,9 +141,10 @@ export default function GoalsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {goals.map((goal) => (
-            <div
+            <Link
               key={goal.id}
-              className="rounded-xl p-5"
+              href={`/dashboard/goals/${goal.id}`}
+              className="rounded-xl p-5 block transition-colors"
               style={{ background: "var(--surface)", border: "1px solid var(--border)" }}
             >
               <div className="flex items-center gap-3 mb-3">
@@ -160,7 +162,7 @@ export default function GoalsPage() {
                   {goal._count?.todos ?? 0} tasks
                 </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

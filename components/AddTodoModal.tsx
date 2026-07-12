@@ -2,35 +2,40 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
-import { Goal } from "@/types";
+import { Goal, Todo } from "@/types";
+
+export interface TodoFormData {
+  title: string;
+  notes?: string;
+  priority: string;
+  type: string;
+  dueDate?: string;
+  goalId?: string;
+}
 
 interface Props {
   goals: Goal[];
-  onAdd: (data: {
-    title: string;
-    notes?: string;
-    priority: string;
-    type: string;
-    dueDate?: string;
-    goalId?: string;
-  }) => Promise<void>;
+  todo?: Todo;
+  initialGoalId?: string;
+  onSubmit: (data: TodoFormData) => Promise<void>;
   onClose: () => void;
 }
 
-export default function AddTodoModal({ goals, onAdd, onClose }: Props) {
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  const [priority, setPriority] = useState("MEDIUM");
-  const [type, setType] = useState("PERSONAL");
-  const [dueDate, setDueDate] = useState("");
-  const [goalId, setGoalId] = useState("");
+export default function AddTodoModal({ goals, todo, initialGoalId, onSubmit, onClose }: Props) {
+  const isEdit = !!todo;
+  const [title, setTitle] = useState(todo?.title ?? "");
+  const [notes, setNotes] = useState(todo?.notes ?? "");
+  const [priority, setPriority] = useState<string>(todo?.priority ?? "MEDIUM");
+  const [type, setType] = useState<string>(todo?.type ?? "PERSONAL");
+  const [dueDate, setDueDate] = useState(todo?.dueDate ? todo.dueDate.slice(0, 10) : "");
+  const [goalId, setGoalId] = useState(todo?.goalId ?? initialGoalId ?? "");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
     setLoading(true);
-    await onAdd({ title, notes: notes || undefined, priority, type, dueDate: dueDate || undefined, goalId: goalId || undefined });
+    await onSubmit({ title, notes: notes || undefined, priority, type, dueDate: dueDate || undefined, goalId: goalId || undefined });
     setLoading(false);
   };
 
@@ -51,7 +56,7 @@ export default function AddTodoModal({ goals, onAdd, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div className="w-full max-w-md rounded-xl p-6 shadow-2xl" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold" style={{ color: "var(--foreground)" }}>Add Todo</h2>
+          <h2 className="font-semibold" style={{ color: "var(--foreground)" }}>{isEdit ? "Edit Todo" : "Add Todo"}</h2>
           <button onClick={onClose} style={{ color: "var(--muted)" }} className="hover:text-white">
             <X size={18} />
           </button>
@@ -125,7 +130,7 @@ export default function AddTodoModal({ goals, onAdd, onClose }: Props) {
               cursor: title.trim() ? "pointer" : "not-allowed",
             }}
           >
-            {loading ? "Adding..." : "Add Todo"}
+            {loading ? (isEdit ? "Saving..." : "Adding...") : isEdit ? "Save Changes" : "Add Todo"}
           </button>
         </form>
       </div>

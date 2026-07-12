@@ -20,6 +20,7 @@ export interface Goal {
   color: string;
   type: GoalType;
   _count?: { todos: number };
+  todos?: Todo[];
 }
 
 export interface OpportunitySummary {
