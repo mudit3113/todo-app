@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, ChevronDown, ChevronUp, Calendar } from "lucide-react";
+import Link from "next/link";
+import { Trash2, ChevronDown, ChevronUp, Calendar, Briefcase } from "lucide-react";
 import { Todo } from "@/types";
 import { PRIORITY_COLORS, PRIORITY_LABELS, cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -78,6 +79,15 @@ export default function TodoItem({ todo, onToggle, onDelete }: Props) {
 
         {/* Meta badges: wrap onto their own row on mobile */}
         <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto pl-8 sm:pl-0 order-3 sm:order-none">
+          {todo.opportunity && (
+            <Link
+              href={`/dashboard/opportunities/${todo.opportunity.id}`}
+              className="text-xs px-2 py-0.5 rounded-full flex items-center gap-1 hover:underline"
+              style={{ background: "var(--accent)" + "22", color: "var(--accent)" }}
+            >
+              <Briefcase size={10} /> {todo.opportunity.company}
+            </Link>
+          )}
           {todo.goal && (
             <span
               className="text-xs px-2 py-0.5 rounded-full"

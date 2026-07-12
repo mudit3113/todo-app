@@ -42,6 +42,7 @@ model User {
   sessions      Session[]
   todos         Todo[]
   goals         Goal[]
+  opportunities Opportunity[]
 }
 
 model VerificationToken {
@@ -65,25 +66,72 @@ model Goal {
 }
 
 model Todo {
-  id               String     @id @default(cuid())
+  id               String       @id @default(cuid())
   userId           String
   goalId           String?
+  opportunityId    String?
   title            String
-  notes            String?    @db.Text
-  priority         Priority   @default(MEDIUM)
-  type             TodoType   @default(PERSONAL)
-  status           TodoStatus @default(PENDING)
+  notes            String?      @db.Text
+  priority         Priority     @default(MEDIUM)
+  type             TodoType     @default(PERSONAL)
+  status           TodoStatus   @default(PENDING)
   dueDate          DateTime?
   completedAt      DateTime?
   googleTaskId     String?
   googleTaskListId String?
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  user             User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  goal             Goal?      @relation(fields: [goalId], references: [id])
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal             Goal?        @relation(fields: [goalId], references: [id])
+  opportunity      Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: SetNull)
 
   @@index([userId, dueDate])
   @@index([userId, status])
+}
+
+model Opportunity {
+  id             String            @id @default(cuid())
+  userId         String
+  company        String
+  role           String
+  sourceName     String?
+  sourcePlatform SourcePlatform    @default(LINKEDIN)
+  sourceUrl      String?
+  status         OpportunityStatus @default(DISCOVERED)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contacts       Contact[]
+  notes          OpportunityNote[]
+  todos          Todo[]
+
+  @@index([userId, status])
+}
+
+model Contact {
+  id            String        @id @default(cuid())
+  opportunityId String
+  name          String
+  channel       ContactChannel @default(LINKEDIN)
+  status        ContactStatus  @default(NOT_CONTACTED)
+  profileUrl    String?
+  contactedAt   DateTime?
+  notes         String?        @db.Text
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  opportunity   Opportunity    @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId])
+}
+
+model OpportunityNote {
+  id            String      @id @default(cuid())
+  opportunityId String
+  content       String      @db.Text
+  createdAt     DateTime    @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([opportunityId])
 }
 
 enum Priority {
@@ -107,4 +155,35 @@ enum TodoStatus {
   PENDING
   COMPLETED
   CANCELLED
+}
+
+enum OpportunityStatus {
+  DISCOVERED
+  OUTREACH_SENT
+  APPLIED
+  INTERVIEWING
+  OFFER
+  REJECTED
+  CLOSED
+}
+
+enum SourcePlatform {
+  LINKEDIN
+  REFERRAL
+  JOB_BOARD
+  OTHER
+}
+
+enum ContactChannel {
+  LINKEDIN
+  EMAIL
+  OTHER
+}
+
+enum ContactStatus {
+  NOT_CONTACTED
+  SENT
+  REPLIED
+  NO_RESPONSE
+  REFERRED
 }

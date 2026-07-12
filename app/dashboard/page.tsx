@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Plus, Filter } from "lucide-react";
-import { format } from "date-fns";
+import { Plus, Filter, ChevronDown, ChevronUp } from "lucide-react";
+import { format, addDays } from "date-fns";
 import { Todo, Goal } from "@/types";
 import TodoItem from "@/components/TodoItem";
 import AddTodoModal from "@/components/AddTodoModal";
@@ -10,9 +10,12 @@ import AITodoInput from "@/components/AITodoInput";
 import { PRIORITY_COLORS } from "@/lib/utils";
 
 const PRIORITY_ORDER: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+const UPCOMING_DAYS = 7;
 
 export default function DashboardPage() {
   const [todos, setTodos] = useState<Todo[]>([]);
+  const [upcoming, setUpcoming] = useState<Todo[]>([]);
+  const [showUpcoming, setShowUpcoming] = useState(true);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [filter, setFilter] = useState<"ALL" | "PERSONAL" | "PROFESSIONAL">("ALL");
@@ -28,24 +31,40 @@ export default function DashboardPage() {
     setLoading(false);
   }, [todayStr]);
 
+  const fetchUpcoming = useCallback(async () => {
+    const from = format(addDays(today, 1), "yyyy-MM-dd");
+    const to = format(addDays(today, UPCOMING_DAYS), "yyyy-MM-dd");
+    const res = await fetch(`/api/todos?from=${from}&to=${to}`);
+    const data = await res.json();
+    setUpcoming(data);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayStr]);
+
   useEffect(() => {
     fetchTodos();
+    fetchUpcoming();
     fetch("/api/goals").then((r) => r.json()).then(setGoals);
-  }, [fetchTodos]);
+  }, [fetchTodos, fetchUpcoming]);
 
   const handleAdd = async (data: Parameters<typeof AddTodoModal>[0]["onAdd"] extends (d: infer D) => unknown ? D : never) => {
+    const dueDate = data.dueDate || todayStr;
     const res = await fetch("/api/todos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, dueDate: todayStr }),
+      body: JSON.stringify({ ...data, dueDate }),
     });
     const newTodo = await res.json();
-    setTodos((prev) => [newTodo, ...prev]);
+    if (dueDate === todayStr) {
+      setTodos((prev) => [newTodo, ...prev]);
+    } else if (dueDate > todayStr) {
+      setUpcoming((prev) => [newTodo, ...prev]);
+    }
     setShowModal(false);
   };
 
   const handleToggle = async (id: string, status: string) => {
     setTodos((prev) => prev.map((t) => t.id === id ? { ...t, status: status as Todo["status"] } : t));
+    setUpcoming((prev) => prev.map((t) => t.id === id ? { ...t, status: status as Todo["status"] } : t));
     await fetch(`/api/todos/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -55,6 +74,7 @@ export default function DashboardPage() {
 
   const handleDelete = async (id: string) => {
     setTodos((prev) => prev.filter((t) => t.id !== id));
+    setUpcoming((prev) => prev.filter((t) => t.id !== id));
     await fetch(`/api/todos/${id}`, { method: "DELETE" });
   };
 
@@ -65,6 +85,14 @@ export default function DashboardPage() {
       if (a.status !== "COMPLETED" && b.status === "COMPLETED") return -1;
       return PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority];
     });
+
+  const upcomingFiltered = upcoming.filter((t) => filter === "ALL" || t.type === filter);
+  const upcomingByDate = upcomingFiltered.reduce<Record<string, Todo[]>>((acc, t) => {
+    const key = t.dueDate ? format(new Date(t.dueDate), "yyyy-MM-dd") : "no-date";
+    acc[key] = [...(acc[key] ?? []), t];
+    return acc;
+  }, {});
+  const upcomingDates = Object.keys(upcomingByDate).sort();
 
   const completed = todos.filter((t) => t.status === "COMPLETED").length;
   const total = todos.length;
@@ -148,6 +176,37 @@ export default function DashboardPage() {
           {filtered.map((todo) => (
             <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} />
           ))}
+        </div>
+      )}
+
+      {/* Upcoming */}
+      {upcomingDates.length > 0 && (
+        <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--border)" }}>
+          <button
+            onClick={() => setShowUpcoming(!showUpcoming)}
+            className="flex items-center gap-1.5 text-sm font-medium mb-3"
+            style={{ color: "var(--foreground)" }}
+          >
+            Upcoming ({upcomingFiltered.length})
+            {showUpcoming ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
+
+          {showUpcoming && (
+            <div className="flex flex-col gap-4">
+              {upcomingDates.map((dateKey) => (
+                <div key={dateKey}>
+                  <p className="text-xs mb-2" style={{ color: "var(--muted)" }}>
+                    {dateKey === "no-date" ? "No date" : format(new Date(dateKey), "EEEE, MMMM d")}
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {upcomingByDate[dateKey].map((todo) => (
+                      <TodoItem key={todo.id} todo={todo} onToggle={handleToggle} onDelete={handleDelete} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

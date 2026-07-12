@@ -25,7 +25,7 @@ export async function PATCH(
   const updated = await prisma.todo.update({
     where: { id },
     data,
-    include: { goal: true },
+    include: { goal: true, opportunity: true },
   });
 
   try {

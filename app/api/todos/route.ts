@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = req.nextUrl;
   const date = searchParams.get("date");
+  const from = searchParams.get("from");
+  const to = searchParams.get("to");
   const type = searchParams.get("type");
 
   const where: Record<string, unknown> = { userId: session.user.id };
@@ -16,12 +18,17 @@ export async function GET(req: NextRequest) {
     const start = new Date(d.setHours(0, 0, 0, 0));
     const end = new Date(d.setHours(23, 59, 59, 999));
     where.dueDate = { gte: start, lte: end };
+  } else if (from || to) {
+    const range: Record<string, Date> = {};
+    if (from) range.gte = new Date(new Date(from).setHours(0, 0, 0, 0));
+    if (to) range.lte = new Date(new Date(to).setHours(23, 59, 59, 999));
+    where.dueDate = range;
   }
   if (type) where.type = type;
 
   const todos = await prisma.todo.findMany({
     where,
-    include: { goal: true },
+    include: { goal: true, opportunity: true },
     orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
   });
 
@@ -33,7 +40,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await req.json();
-  const { title, notes, priority, type, dueDate, goalId } = body;
+  const { title, notes, priority, type, dueDate, goalId, opportunityId } = body;
 
   if (!title?.trim()) return Response.json({ error: "Title required" }, { status: 400 });
 
@@ -46,8 +53,9 @@ export async function POST(req: NextRequest) {
       type: type ?? "PERSONAL",
       dueDate: dueDate ? new Date(dueDate) : null,
       goalId: goalId ?? null,
+      opportunityId: opportunityId ?? null,
     },
-    include: { goal: true },
+    include: { goal: true, opportunity: true },
   });
 
   try {

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import { LayoutDashboard, BarChart2, Target, LogOut, RefreshCw } from "lucide-react";
+import { LayoutDashboard, BarChart2, Target, LogOut, RefreshCw, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -17,7 +17,12 @@ const navItems = [
   { href: "/dashboard", label: "Today", icon: LayoutDashboard },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart2 },
   { href: "/dashboard/goals", label: "Goals", icon: Target },
+  { href: "/dashboard/opportunities", label: "Jobs", icon: Briefcase },
 ];
+
+function isActive(pathname: string, href: string) {
+  return href === "/dashboard" ? pathname === href : pathname.startsWith(href);
+}
 
 export default function Navbar({ userName, userImage }: Props) {
   const pathname = usePathname();
@@ -51,11 +56,11 @@ export default function Navbar({ userName, userImage }: Props) {
                 href={href}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors",
-                  pathname === href ? "text-white" : "hover:text-white"
+                  isActive(pathname, href) ? "text-white" : "hover:text-white"
                 )}
                 style={{
-                  background: pathname === href ? "var(--accent)" : "transparent",
-                  color: pathname === href ? "white" : "var(--muted)",
+                  background: isActive(pathname, href) ? "var(--accent)" : "transparent",
+                  color: isActive(pathname, href) ? "white" : "var(--muted)",
                 }}
               >
                 <Icon size={14} />
@@ -113,7 +118,7 @@ export default function Navbar({ userName, userImage }: Props) {
             key={href}
             href={href}
             className="flex flex-col items-center gap-1 py-2 px-4 flex-1 text-[11px]"
-            style={{ color: pathname === href ? "var(--accent)" : "var(--muted)" }}
+            style={{ color: isActive(pathname, href) ? "var(--accent)" : "var(--muted)" }}
           >
             <Icon size={18} />
             {label}
